@@ -1,0 +1,33 @@
+{
+  "name": "russian-stress-extension",
+  "version": "1.0.0",
+  "description": "Chrome / Edge 浏览器俄语重音助手扩展：完全离线在网页、选区与输入框中智能标注重音。",
+  "scripts": {
+    "test": "node tests/stress-regression-test.js",
+    "package": "node scripts/package.js",
+    "build": "node scripts/package.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wanxiao2018/russian-stress-extension.git"
+  },
+  "homepage": "https://github.com/wanxiao2018/russian-stress-extension#readme",
+  "bugs": {
+    "url": "https://github.com/wanxiao2018/russian-stress-extension/issues"
+  },
+  "keywords": [
+    "russian",
+    "stress",
+    "accents",
+    "chrome-extension",
+    "edge-extension",
+    "openrussian",
+    "language-learning"
+  ],
+  "author": "wanxiao2018",
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
+

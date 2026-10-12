@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>俄语重音助手设置</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <h1>自定义词典</h1>
+      <p>每行一个词条，格式为 <code>word = wórd</code>。以 <code>#</code> 开头的行会被忽略。</p>
+      <textarea id="custom-dictionary" spellcheck="false" placeholder="пример = приме́р&#10;письмо = письмо́"></textarea>
+      <div class="actions">
+        <button id="save" type="button">保存</button>
+        <button id="reset" type="button">清空</button>
+      </div>
+      <p id="status" role="status"></p>
+    </main>
+    <script src="accent.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

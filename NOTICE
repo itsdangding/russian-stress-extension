@@ -1,0 +1,14 @@
+stress-data.json is not covered by the MIT license.
+
+It is derived from the OpenRussian dictionary:
+
+https://github.com/Badestrand/russian-dictionary
+
+That data is licensed under Creative Commons Attribution-ShareAlike 4.0
+International (CC BY-SA 4.0):
+
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Redistributing the dictionary, or a modified dictionary, requires attribution
+and sharing the dictionary under the same license. The extension code stays
+under the MIT license in LICENSE.
