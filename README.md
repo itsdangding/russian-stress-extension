@@ -38,7 +38,7 @@ A lightweight Chrome / Edge extension that displays Russian word stress marks di
 
 ### 方式一：下载已编译 Release 安装包（推荐普通用户）
 
-1. 前往 GitHub **[Releases 页面](https://github.com/wanxiao2018/russian-stress-extension/releases)** 下载最新的 `russian-stress-extension-v1.1.1.zip` 压缩包。
+1. 前往 GitHub **[Releases 页面](https://github.com/wanxiao2018/russian-stress-extension/releases)** 下载最新的 `russian-stress-extension-v1.1.2.zip` 压缩包。
 2. 将下载的 ZIP 压缩包解压到本地一个固定的目录（例如 `~/Extensions/russian-stress-extension`）。
 3. 打开基于 Chromium 的浏览器，在地址栏输入对应扩展管理地址：
    - **Google Chrome**: `chrome://extensions`

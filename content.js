@@ -362,10 +362,8 @@
     const element = focusedField || rememberedEditable();
     if (element) return accentWholeEditable(element);
 
-    if (document.activeElement instanceof HTMLIFrameElement) {
-      const frameRes = await forwardActionToSubframes("accent-current");
-      if (frameRes) return frameRes;
-    }
+    const frameRes = await forwardActionToSubframes("accent-current");
+    if (frameRes) return frameRes;
 
     return false;
   }
@@ -435,6 +433,7 @@
           editables.forEach((el) => {
             if (!isEditable(el)) return;
             if (el instanceof HTMLInputElement && el.type === "password") return;
+            if (el === document.activeElement) return;
             if (pageOriginalInputs.some((entry) => entry.element === el)) return;
             const val = el.value;
             if (!val || !CYRILLIC_RE.test(val)) return;
@@ -563,10 +562,15 @@
       }
     });
 
+    const subframeRes = await forwardActionToSubframes("accent-page");
+    if (subframeRes?.changed) {
+      totalChanged = true;
+      totalChangedNodes += (subframeRes.changedNodes || 0);
+    }
+
     if (totalChanged) {
       pageAccented = true;
       startPageObserver();
-      forwardActionToSubframes("accent-page");
     }
     return { changed: totalChanged, changedNodes: totalChangedNodes, pageAccented };
   }
@@ -604,6 +608,10 @@
     }
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) {
+      button.style.display = "none";
+      return;
+    }
+    if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
       button.style.display = "none";
       return;
     }
@@ -718,9 +726,22 @@
   function showTooltip(event, result) {
     tooltip.textContent = result.forms.join(" / ");
     tooltip.dataset.ambiguous = String(result.ambiguous);
-    tooltip.style.left = `${Math.min(window.innerWidth - 12, event.clientX + 12)}px`;
-    tooltip.style.top = `${Math.min(window.innerHeight - 12, event.clientY + 14)}px`;
     tooltip.style.display = "block";
+
+    const width = tooltip.offsetWidth || 180;
+    const height = tooltip.offsetHeight || 36;
+    let left = event.clientX + 12;
+    let top = event.clientY + 14;
+
+    if (left + width > window.innerWidth - 8) {
+      left = Math.max(8, event.clientX - width - 12);
+    }
+    if (top + height > window.innerHeight - 8) {
+      top = Math.max(8, event.clientY - height - 12);
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
   }
 
   function hideTooltip() {

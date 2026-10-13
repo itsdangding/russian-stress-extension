@@ -355,14 +355,27 @@
     if (source.toLocaleUpperCase("ru-RU") === source) {
       return accented.toLocaleUpperCase("ru-RU");
     }
-    const first = Array.from(source)[0];
-    if (first && first.toLocaleUpperCase("ru-RU") === first && source.slice(1).toLocaleLowerCase("ru-RU") === source.slice(1)) {
-      return Array.from(accented).map((char, index) => {
-        if (index === 0) return char.toLocaleUpperCase("ru-RU");
-        return char.toLocaleLowerCase("ru-RU");
-      }).join("");
+    const srcChars = Array.from(source);
+    const accChars = Array.from(accented);
+    let srcIndex = 0;
+    const result = [];
+    for (let i = 0; i < accChars.length; i += 1) {
+      const char = accChars[i];
+      if (char === ACUTE) {
+        result.push(char);
+      } else if (srcIndex < srcChars.length) {
+        const srcChar = srcChars[srcIndex];
+        srcIndex += 1;
+        if (srcChar.toLocaleUpperCase("ru-RU") === srcChar && srcChar.toLocaleLowerCase("ru-RU") !== srcChar) {
+          result.push(char.toLocaleUpperCase("ru-RU"));
+        } else {
+          result.push(char.toLocaleLowerCase("ru-RU"));
+        }
+      } else {
+        result.push(char);
+      }
     }
-    return accented;
+    return result.join("");
   }
 
   function buildDictionary(customEntries) {
@@ -423,10 +436,14 @@
 
   function stressText(text, customEntries, options) {
     return sanitizeStress(String(text || "").replace(WORD_RE, (word) => {
-      if (word.includes("-")) {
-        return word.split("-").map((part) => stressWord(part, customEntries, options)).join("-");
+      const sanitized = sanitizeStress(word);
+      if (hasStress(sanitized)) return sanitized;
+      const whole = stressWord(sanitized, customEntries, options);
+      if (whole !== sanitized) return whole;
+      if (sanitized.includes("-")) {
+        return sanitized.split("-").map((part) => stressWord(part, customEntries, options)).join("-");
       }
-      return stressWord(word, customEntries, options);
+      return whole;
     }));
   }
 
@@ -477,7 +494,18 @@
   function lookupWord(word, customEntries) {
     const key = normalizeKey(word);
     const entry = getDictionaryEntry(key, customEntries || {});
-    const forms = presentForms(entry, word);
+    let forms = presentForms(entry, word);
+    if (!forms.length && word.includes("-")) {
+      const parts = word.split("-");
+      const partResults = parts.map((part) => lookupWord(part, customEntries));
+      if (partResults.some(Boolean)) {
+        const joined = parts.map((part, index) => {
+          const res = partResults[index];
+          return res ? res.forms[0] : part;
+        }).join("-");
+        forms = [joined];
+      }
+    }
     if (!forms.length) return null;
     return {
       key,
@@ -501,7 +529,7 @@
       const parts = trimmed.split(separator);
       const key = stripStress(parts[0]).trim();
       const value = parts.slice(1).join(separator).trim();
-      if (key && value) result[normalizeKey(key)] = value;
+      if (key && value) result[normalizeKey(key)] = sanitizeStress(value);
     });
     return result;
   }
