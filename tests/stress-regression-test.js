@@ -46,7 +46,13 @@ function runDictionaryTests() {
     ["украина", "украи\u0301на"],
     ["замок", "замок"],
     ["все", "все"],
-    ["всё", "всё"]
+    ["всё", "всё"],
+    ["килограммов", "килогра\u0301ммов"],
+    ["10 килограммов", "10 килогра\u0301ммов"],
+    ["километров", "киломе\u0301тров"],
+    ["минут", "мину\u0301т"],
+    ["мальчиков", "ма\u0301льчиков"],
+    ["продуктов", "проду\u0301ктов"]
   ];
 
   cases.forEach(([input, expected]) => {
@@ -63,6 +69,8 @@ function runDictionaryTests() {
 
   const looked = stress.lookupWord("взлета", {});
   assert(looked && looked.forms.every((form) => !form.includes(`\u0451${ACUTE}`)), `lookup взлета => ${JSON.stringify(looked)}`);
+  const kgLooked = stress.lookupWord("килограммов", {});
+  assert(kgLooked && !kgLooked.ambiguous && kgLooked.forms.length === 1 && kgLooked.forms[0] === "килогра\u0301ммов", `lookup килограммов => ${JSON.stringify(kgLooked)}`);
   const ambiguous = stress.lookupWord("замок", {});
   assert(ambiguous && ambiguous.ambiguous && ambiguous.forms.length > 1, `замок should stay ambiguous: ${JSON.stringify(ambiguous)}`);
 
