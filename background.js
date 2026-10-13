@@ -8,7 +8,11 @@ chrome.commands.onCommand.addListener(async (command) => {
     await chrome.tabs.sendMessage(tab.id, { type: "accent-current" });
   } catch (error) {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["accent.js", "content.js"] });
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["accent.js", "content.js"] });
+      } catch (_e) {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["accent.js", "content.js"] });
+      }
       await chrome.tabs.sendMessage(tab.id, { type: "accent-current" });
     } catch (_error) {
       // The active page may not match the extension host permissions.

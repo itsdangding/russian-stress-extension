@@ -38,7 +38,7 @@ A lightweight Chrome / Edge extension that displays Russian word stress marks di
 
 ### 方式一：下载已编译 Release 安装包（推荐普通用户）
 
-1. 前往 GitHub **[Releases 页面](https://github.com/wanxiao2018/russian-stress-extension/releases)** 下载最新的 `russian-stress-extension-v1.0.0.zip` 压缩包。
+1. 前往 GitHub **[Releases 页面](https://github.com/wanxiao2018/russian-stress-extension/releases)** 下载最新的 `russian-stress-extension-v1.1.0.zip` 压缩包。
 2. 将下载的 ZIP 压缩包解压到本地一个固定的目录（例如 `~/Extensions/russian-stress-extension`）。
 3. 打开基于 Chromium 的浏览器，在地址栏输入对应扩展管理地址：
    - **Google Chrome**: `chrome://extensions`
@@ -81,15 +81,15 @@ npm run package
 
 | 功能按键 | 说明 |
 | :--- | :--- |
-| **给当前页面加重音 / 取消当前页面重音** | 全文模式：切换当前网页全局俄语重音状态。 |
-| **开启悬停查词 / 关闭悬停查词** | 悬停模式：鼠标移入单词时弹出重音提示卡片，支持多重音候选。 |
-| **给选中文本加重音** | 选区模式：对当前鼠标划选的文本区域添加重音。 |
-| **给光标所在输入框加重音** | 输入框模式：处理光标所在的输入框或文本域内容。 |
+| **给当前页面加重音 / 取消当前页面重音** | 全文模式：切换当前网页全局俄语重音状态，自动监听新闻等动态加载内容。 |
+| **开启悬停查词 / 关闭悬停查词** | 悬停模式：鼠标移入单词时弹出重音提示卡片，支持普通正文与输入框。 |
+| **添加/取消选中文本重音** | 选区模式：对当前鼠标划选的文本区域添加或取消重音（支持双向切换）。 |
+| **添加/取消光标输入框重音** | 输入框模式：为光标所在的输入框或文本域添加或取消重音（支持双向切换）。 |
 | **自定义词典** | 点击可进入自定义词典配置页面。 |
 
 ### 快捷键
 
-- 默认快捷键：`Alt+Shift+A`（为当前光标所在输入框或选区添加重音）。
+- 默认快捷键：`Alt+Shift+A`（为当前光标所在输入框或选区添加/取消重音）。
 - **自定义快捷键**：可在浏览器地址栏访问 `chrome://extensions/shortcuts`（Edge 访问 `edge://extensions/shortcuts`），找到「俄语重音助手」并绑定为你喜欢的快捷键组合。
 
 ### 自定义词典格式

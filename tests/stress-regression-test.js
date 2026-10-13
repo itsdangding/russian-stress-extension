@@ -169,6 +169,7 @@ async function runDomTests() {
     <p id="fresh">можно</p>
     <input id="secret" type="password" value="секрет">
     <input id="box" type="text" value="письмо">
+    <textarea id="area">пример</textarea>
     <div id="editor" contenteditable="true">замок и город</div>
   </body></html>`, { url: "https://example.com/", pretendToBeVisual: true, runScripts: "dangerously" });
   const { window } = dom;
@@ -215,12 +216,18 @@ async function runDomTests() {
 
   box.focus();
   const first = await send(listener, { type: "accent-current" });
-  const second = await send(listener, { type: "accent-current" });
   assert(first.changed === true, "text input was not accented");
-  assert(second.changed === false, "second input accent reported a change");
   assert(box.value === "письмо\u0301", `input value ${JSON.stringify(box.value)}`);
+
+  const second = await send(listener, { type: "accent-current" });
+  assert(second.changed === true && second.unaccented === true, "second input accent did not unaccent");
+  assert(box.value === "письмо", `input value after unaccent ${JSON.stringify(box.value)}`);
+
+  const third = await send(listener, { type: "accent-current" });
+  assert(third.changed === true && !third.unaccented, "third input accent did not re-accent");
+  assert(box.value === "письмо\u0301", `input value after re-accent ${JSON.stringify(box.value)}`);
   assert(!badMark(box.value), `input has a bad mark ${JSON.stringify(box.value)}`);
-  assert(inputEvents === 1, `input events ${inputEvents}`);
+  assert(inputEvents === 3, `input events ${inputEvents}`);
 
   const articleNodes = textNode(article);
   selectRange(window, articleNodes[0], 0, articleNodes[articleNodes.length - 1], articleNodes[articleNodes.length - 1].nodeValue.length);
@@ -256,12 +263,29 @@ async function runDomTests() {
   assert(box.value === "город", `stale input was edited: ${box.value}`);
   assert(other.textContent === "го\u0301род", `other text ${JSON.stringify(other.textContent)}`);
 
+  const area = window.document.getElementById("area");
   const page = await send(listener, { type: "accent-page" });
   assert(page.ok && page.pageAccented, `page accent failed ${JSON.stringify(page)}`);
   assert(fresh.textContent === "мо\u0301жно", `fresh text ${JSON.stringify(fresh.textContent)}`);
+  assert(box.value === "го\u0301род", `box input was not accented by page accent: ${box.value}`);
+  assert(area.value === "приме\u0301р", `textarea was not accented by page accent: ${area.value}`);
+  assert(secret.value === "секрет", `password was modified by page accent: ${secret.value}`);
+
+  const dyn = window.document.createElement("p");
+  dyn.id = "dyn";
+  dyn.textContent = "свежие новости";
+  window.document.body.appendChild(dyn);
+
+  await new Promise((r) => setTimeout(r, 450));
+  assert(dyn.textContent.includes("све\u0301жие") || dyn.textContent.includes("но\u0301вости"), `dynamic news node was not accented: ${dyn.textContent}`);
+
   const restored = await send(listener, { type: "restore-page" });
   assert(restored.restored === true, `restore failed ${JSON.stringify(restored)}`);
   assert(fresh.textContent === "можно", `restore left ${JSON.stringify(fresh.textContent)}`);
+  assert(box.value === "город", `box input was not restored: ${box.value}`);
+  assert(area.value === "пример", `textarea was not restored: ${area.value}`);
+  assert(secret.value === "секрет", `password was modified on restore: ${secret.value}`);
+  assert(dyn.textContent === "свежие новости", `dynamic news node was not restored: ${dyn.textContent}`);
 }
 
 async function main() {

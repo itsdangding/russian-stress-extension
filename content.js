@@ -15,6 +15,7 @@
   let hoverTimer = null;
   let pageAccented = false;
   let pageOriginalNodes = [];
+  let pageOriginalInputs = [];
 
   const style = document.createElement("style");
   style.textContent = `
@@ -62,8 +63,8 @@
   button.id = BUTTON_ID;
   button.type = "button";
   button.textContent = "\u0410\u0301";
-  button.title = "添加俄语重音 (Alt+Shift+A)";
-  button.setAttribute("aria-label", "添加俄语重音");
+  button.title = "添加/取消俄语重音 (Alt+Shift+A)";
+  button.setAttribute("aria-label", "添加或取消俄语重音");
   document.documentElement.appendChild(button);
 
   const tooltip = document.createElement("div");
@@ -119,13 +120,24 @@
     const before = value.slice(0, targetStart);
     const selected = value.slice(targetStart, targetEnd);
     const after = value.slice(targetEnd);
-    const accented = await RussianStress.stressTextAsync(selected, customEntries);
-    if (accented === selected) return false;
 
-    element.value = `${before}${accented}${after}`;
-    element.setSelectionRange(targetStart, targetStart + accented.length);
+    const accented = await RussianStress.stressTextAsync(selected, customEntries);
+    let resultText = accented;
+    let unaccented = false;
+
+    if (accented === selected) {
+      if (selected.includes(RussianStress.ACUTE)) {
+        resultText = RussianStress.stripStress(selected);
+        unaccented = true;
+      } else {
+        return false;
+      }
+    }
+
+    element.value = `${before}${resultText}${after}`;
+    element.setSelectionRange(targetStart, targetStart + resultText.length);
     dispatchInput(element);
-    return true;
+    return { changed: true, unaccented };
   }
 
   function rememberedEditable() {
@@ -220,6 +232,26 @@
     await RussianStress.loadStressData();
     const slices = textSlicesInRange(range);
     if (!slices.length) return false;
+
+    const originalText = slices.map((slice) => slice.text).join("");
+    const accentedText = RussianStress.stressText(originalText, customEntries);
+    let shouldUnaccent = false;
+    if (accentedText === originalText && originalText.includes(RussianStress.ACUTE)) {
+      shouldUnaccent = true;
+    }
+
+    if (shouldUnaccent) {
+      let changed = false;
+      slices.forEach((slice) => {
+        const stripped = RussianStress.stripStress(slice.text);
+        if (stripped !== slice.text) {
+          writeSlice(slice, stripped);
+          changed = true;
+        }
+      });
+      return { changed, unaccented: true };
+    }
+
     if (canJoinSlices(slices)) {
       const distributed = RussianStress.splitAccented(slices.map((slice) => slice.text), customEntries);
       if (distributed && !distributed.changed) return false;
@@ -230,7 +262,7 @@
           writeSlice(slice, distributed.parts[index]);
           changed = true;
         });
-        return changed;
+        return { changed, unaccented: false };
       }
     }
     let changed = false;
@@ -240,19 +272,19 @@
       writeSlice(slice, next);
       changed = true;
     });
-    return changed;
+    return { changed, unaccented: false };
   }
 
   async function replaceContentEditableSelection(element) {
     if (!selectionInside(element)) return false;
     const range = pageSelectionRange();
     if (!range) return false;
-    const changed = await accentTextInRange(range);
-    if (!changed) return false;
+    const result = await accentTextInRange(range);
+    if (!result || (result.changed === false && !result.unaccented)) return false;
     const endNode = range.endContainer.nodeType === Node.TEXT_NODE ? range.endContainer : null;
     placeCaretAfterNode(endNode);
     dispatchInput(element);
-    return true;
+    return result;
   }
 
   function shouldSkipTextNode(node, includeEditable) {
@@ -296,7 +328,13 @@
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
       return replaceInputSelection(element, false);
     }
-    return (await replaceAllTextNodes(element, true)).changed;
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const result = await accentTextInRange(range);
+    if (result && (result.changed || result.unaccented)) {
+      dispatchInput(element);
+    }
+    return result;
   }
 
   async function accentEditableSelection(element) {
@@ -311,9 +349,9 @@
     const range = pageSelectionRange();
     if (!range) return false;
     const endNode = range.endContainer.nodeType === Node.TEXT_NODE ? range.endContainer : null;
-    const changed = await accentTextInRange(range);
-    if (changed) placeCaretAfterNode(endNode);
-    return changed;
+    const result = await accentTextInRange(range);
+    if (result && (result.changed || result.unaccented)) placeCaretAfterNode(endNode);
+    return result;
   }
 
   async function accentCurrentTarget() {
@@ -323,6 +361,12 @@
     if (pageSelectionRange()) return accentPageSelection();
     const element = focusedField || rememberedEditable();
     if (element) return accentWholeEditable(element);
+
+    if (document.activeElement instanceof HTMLIFrameElement) {
+      const frameRes = await forwardActionToSubframes("accent-current");
+      if (frameRes) return frameRes;
+    }
+
     return false;
   }
 
@@ -342,17 +386,195 @@
     return false;
   }
 
+  let pageObserver = null;
+  let observerTimer = null;
+
+  function startPageObserver() {
+    if (pageObserver || typeof MutationObserver === "undefined") return;
+    const targetRoot = document.body || document.documentElement;
+    if (!targetRoot) return;
+
+    pageObserver = new MutationObserver((mutations) => {
+      if (!pageAccented) return;
+
+      let hasRelevant = false;
+      for (let i = 0; i < mutations.length; i += 1) {
+        const m = mutations[i];
+        if (m.target?.closest?.(`#${BUTTON_ID}, #${TOOLTIP_ID}`)) continue;
+        if (m.type === "childList" && m.addedNodes.length > 0) {
+          for (let j = 0; j < m.addedNodes.length; j += 1) {
+            const node = m.addedNodes[j];
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.id === BUTTON_ID || node.id === TOOLTIP_ID) continue;
+              if (["SCRIPT", "STYLE", "NOSCRIPT", "SVG"].includes(node.tagName)) continue;
+              hasRelevant = true;
+              break;
+            } else if (node.nodeType === Node.TEXT_NODE && CYRILLIC_RE.test(node.nodeValue)) {
+              hasRelevant = true;
+              break;
+            }
+          }
+        }
+        if (hasRelevant) break;
+      }
+
+      if (!hasRelevant) return;
+
+      clearTimeout(observerTimer);
+      observerTimer = setTimeout(async () => {
+        if (!pageAccented || !pageObserver) return;
+        pageObserver.disconnect();
+        try {
+          const result = await replaceAllTextNodes(document.body || document.documentElement, true, true);
+          if (result.changed) {
+            pageOriginalNodes.push(...result.originalNodes);
+          }
+
+          const root = document.body || document.documentElement;
+          const editables = root.querySelectorAll("textarea, input");
+          editables.forEach((el) => {
+            if (!isEditable(el)) return;
+            if (el instanceof HTMLInputElement && el.type === "password") return;
+            if (pageOriginalInputs.some((entry) => entry.element === el)) return;
+            const val = el.value;
+            if (!val || !CYRILLIC_RE.test(val)) return;
+            const accented = RussianStress.stressText(val, customEntries);
+            if (accented !== val) {
+              pageOriginalInputs.push({ element: el, value: val });
+              el.value = accented;
+              dispatchInput(el);
+            }
+          });
+        } finally {
+          if (pageAccented && pageObserver) {
+            pageObserver.observe(document.body || document.documentElement, {
+              childList: true,
+              subtree: true
+            });
+          }
+        }
+      }, 300);
+    });
+
+    pageObserver.observe(targetRoot, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function stopPageObserver() {
+    clearTimeout(observerTimer);
+    if (pageObserver) {
+      pageObserver.disconnect();
+      pageObserver = null;
+    }
+  }
+
+  function forwardActionToSubframes(action, payload = {}) {
+    return new Promise((resolve) => {
+      const iframes = Array.from(document.querySelectorAll("iframe"));
+      if (!iframes.length) {
+        resolve(false);
+        return;
+      }
+      let settled = false;
+      const handler = (event) => {
+        if (event.data?.type === "__RUSSIAN_STRESS_RESPONSE__" && event.data.action === action) {
+          settled = true;
+          window.removeEventListener("message", handler);
+          resolve(event.data.result);
+        }
+      };
+      window.addEventListener("message", handler);
+      setTimeout(() => {
+        if (!settled) {
+          window.removeEventListener("message", handler);
+          resolve(false);
+        }
+      }, 350);
+
+      iframes.forEach((f) => {
+        try {
+          f.contentWindow?.postMessage({ type: "__RUSSIAN_STRESS_ACTION__", action, ...payload }, "*");
+        } catch (_e) {}
+      });
+    });
+  }
+
+  window.addEventListener("message", async (event) => {
+    if (event.data?.type === "__RUSSIAN_STRESS_ACTION__") {
+      const action = event.data.action;
+      if (action === "accent-current") {
+        const focused = getEditableFromTarget(document.activeElement) || rememberedEditable();
+        if (focused && isEditable(focused)) {
+          const res = await accentCurrentTarget();
+          event.source?.postMessage({
+            type: "__RUSSIAN_STRESS_RESPONSE__",
+            action,
+            result: res
+          }, "*");
+        }
+      } else if (action === "accent-page") {
+        const res = await accentReadablePage();
+        event.source?.postMessage({
+          type: "__RUSSIAN_STRESS_RESPONSE__",
+          action,
+          result: res
+        }, "*");
+      } else if (action === "restore-page") {
+        const res = restoreReadablePage();
+        event.source?.postMessage({
+          type: "__RUSSIAN_STRESS_RESPONSE__",
+          action,
+          result: res
+        }, "*");
+      }
+    }
+  });
+
   async function accentReadablePage() {
     if (pageAccented) return { changed: false, changedNodes: 0, pageAccented: true };
-    const result = await replaceAllTextNodes(document.body || document.documentElement, false, true);
+    await RussianStress.loadStressData();
+    let totalChanged = false;
+    let totalChangedNodes = 0;
+
+    const result = await replaceAllTextNodes(document.body || document.documentElement, true, true);
     if (result.changed) {
       pageOriginalNodes = result.originalNodes;
-      pageAccented = true;
+      totalChanged = true;
+      totalChangedNodes += result.changedNodes;
     }
-    return { changed: result.changed, changedNodes: result.changedNodes, pageAccented };
+
+    pageOriginalInputs = [];
+    const root = document.body || document.documentElement;
+    const editables = root.querySelectorAll("textarea, input");
+    editables.forEach((el) => {
+      if (!isEditable(el)) return;
+      if (el instanceof HTMLInputElement && el.type === "password") return;
+      const val = el.value;
+      if (!val || !CYRILLIC_RE.test(val)) return;
+      const accented = RussianStress.stressText(val, customEntries);
+      if (accented !== val) {
+        pageOriginalInputs.push({ element: el, value: val });
+        el.value = accented;
+        dispatchInput(el);
+        totalChanged = true;
+        totalChangedNodes += 1;
+      }
+    });
+
+    if (totalChanged) {
+      pageAccented = true;
+      startPageObserver();
+      forwardActionToSubframes("accent-page");
+    }
+    return { changed: totalChanged, changedNodes: totalChangedNodes, pageAccented };
   }
 
   function restoreReadablePage() {
+    stopPageObserver();
+    forwardActionToSubframes("restore-page");
+
     let changedNodes = 0;
     pageOriginalNodes.forEach((entry) => {
       if (entry.node?.isConnected && entry.node.nodeValue !== entry.value) {
@@ -361,6 +583,16 @@
       }
     });
     pageOriginalNodes = [];
+
+    pageOriginalInputs.forEach((entry) => {
+      if (entry.element?.isConnected && entry.element.value !== entry.value) {
+        entry.element.value = entry.value;
+        dispatchInput(entry.element);
+        changedNodes += 1;
+      }
+    });
+    pageOriginalInputs = [];
+
     pageAccented = false;
     return { restored: true, changed: changedNodes > 0, changedNodes, pageAccented };
   }
@@ -394,10 +626,80 @@
     return null;
   }
 
+  function getWordFromInputOrTextarea(element, x, y) {
+    if (!(element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement)) return null;
+    if (element instanceof HTMLInputElement && element.type === "password") return null;
+
+    const value = element.value;
+    if (!value || !CYRILLIC_RE.test(value)) return null;
+
+    const rect = element.getBoundingClientRect();
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
+
+    const computed = window.getComputedStyle(element);
+    const mirror = document.createElement("div");
+    const copyProps = [
+      "fontFamily", "fontSize", "fontWeight", "fontStyle",
+      "letterSpacing", "wordSpacing", "textIndent",
+      "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+      "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+      "boxSizing", "lineHeight"
+    ];
+    copyProps.forEach((prop) => { mirror.style[prop] = computed[prop]; });
+    mirror.style.position = "fixed";
+    mirror.style.left = `${rect.left}px`;
+    mirror.style.top = `${rect.top}px`;
+    mirror.style.width = `${rect.width}px`;
+    mirror.style.height = `${rect.height}px`;
+    mirror.style.whiteSpace = element instanceof HTMLTextAreaElement ? "pre-wrap" : "pre";
+    mirror.style.wordBreak = "break-word";
+    mirror.style.overflowWrap = "break-word";
+    mirror.style.overflow = "hidden";
+    mirror.style.visibility = "visible";
+    mirror.style.opacity = "0";
+    mirror.style.pointerEvents = "auto";
+    mirror.style.zIndex = "2147483645";
+    mirror.textContent = value;
+    mirror.scrollTop = element.scrollTop;
+    mirror.scrollLeft = element.scrollLeft;
+
+    (document.body || document.documentElement).appendChild(mirror);
+    let word = null;
+    try {
+      const range = getTextRangeFromPoint(x, y);
+      const node = range?.startContainer;
+      if (node && node.nodeType === Node.TEXT_NODE) {
+        const text = node.nodeValue || "";
+        let start = range.startOffset;
+        let end = range.startOffset;
+        if (!WORD_CHAR_RE.test(text[start] || "") && start > 0 && WORD_CHAR_RE.test(text[start - 1])) {
+          start -= 1;
+          end -= 1;
+        }
+        while (start > 0 && WORD_CHAR_RE.test(text[start - 1])) start -= 1;
+        while (end < text.length && WORD_CHAR_RE.test(text[end])) end += 1;
+        const candidate = text.slice(start, end).replace(/^-+|-+$/g, "");
+        if (CYRILLIC_RE.test(candidate)) word = candidate;
+      }
+    } finally {
+      mirror.remove();
+    }
+    return word;
+  }
+
   function wordAtPoint(x, y) {
+    if (document.elementFromPoint) {
+      const target = document.elementFromPoint(x, y);
+      if (target && target.closest(`#${BUTTON_ID}, #${TOOLTIP_ID}, script, style, noscript`)) return null;
+      const inputOrTextarea = target?.closest?.("textarea, input");
+      if (inputOrTextarea && isEditable(inputOrTextarea)) {
+        return getWordFromInputOrTextarea(inputOrTextarea, x, y);
+      }
+    }
+
     const range = getTextRangeFromPoint(x, y);
     const node = range?.startContainer;
-    if (!node || node.nodeType !== Node.TEXT_NODE || shouldSkipTextNode(node, false)) return null;
+    if (!node || node.nodeType !== Node.TEXT_NODE || shouldSkipTextNode(node, true)) return null;
 
     const text = node.nodeValue;
     let start = range.startOffset;
@@ -426,7 +728,14 @@
   }
 
   function scheduleHoverLookup(event) {
-    if (!hoverEnabled || getEditableFromTarget(event.target)) {
+    if (!hoverEnabled) {
+      hideTooltip();
+      return;
+    }
+    if (event.target?.closest?.(`#${BUTTON_ID}, #${TOOLTIP_ID}`)) {
+      return;
+    }
+    if (event.target instanceof HTMLInputElement && event.target.type === "password") {
       hideTooltip();
       return;
     }
@@ -466,6 +775,10 @@
     rememberEditable(document.activeElement);
   });
 
+  document.addEventListener("input", (event) => {
+    rememberEditable(event.target);
+  });
+
   document.addEventListener("focusout", () => {
     setTimeout(() => {
       if (!document.activeElement || !isEditable(getEditableFromTarget(document.activeElement))) {
@@ -494,11 +807,19 @@
 
   globalThis.chrome?.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
     if (message?.type === "accent-current") {
-      accentCurrentTarget().then((changed) => sendResponse({ ok: true, changed })).catch((error) => sendResponse({ ok: false, error: error.message }));
+      accentCurrentTarget().then((res) => {
+        const changed = Boolean(res?.changed ?? res);
+        const unaccented = Boolean(res?.unaccented);
+        sendResponse({ ok: true, changed, unaccented });
+      }).catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
     if (message?.type === "accent-selection") {
-      accentSelectedText().then((changed) => sendResponse({ ok: true, changed })).catch((error) => sendResponse({ ok: false, error: error.message }));
+      accentSelectedText().then((res) => {
+        const changed = Boolean(res?.changed ?? res);
+        const unaccented = Boolean(res?.unaccented);
+        sendResponse({ ok: true, changed, unaccented });
+      }).catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
     if (message?.type === "accent-page") {

@@ -19,7 +19,11 @@ async function sendToActiveTab(type, payload = {}) {
   try {
     return await chrome.tabs.sendMessage(tab.id, { type, ...payload });
   } catch (error) {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["accent.js", "content.js"] });
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["accent.js", "content.js"] });
+    } catch (_e) {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["accent.js", "content.js"] });
+    }
     return chrome.tabs.sendMessage(tab.id, { type, ...payload });
   }
 }
@@ -88,7 +92,11 @@ document.getElementById("toggle-hover").addEventListener("click", async () => {
 document.getElementById("accent-current").addEventListener("click", async () => {
   try {
     const response = await sendToActiveTab("accent-current");
-    setStatus(response?.changed ? "已给光标所在输入框添加重音。" : "请先把光标放进输入框，或选择文本。");
+    if (response?.unaccented) {
+      setStatus("已取消光标所在输入框的重音。");
+    } else {
+      setStatus(response?.changed ? "已给光标所在输入框添加重音。" : "请先把光标放进输入框，或选择文本。");
+    }
   } catch (error) {
     setStatus("请打开普通网页后再试。浏览器内部页面不支持。");
   }
@@ -97,7 +105,11 @@ document.getElementById("accent-current").addEventListener("click", async () => 
 document.getElementById("accent-selection").addEventListener("click", async () => {
   try {
     const response = await sendToActiveTab("accent-selection");
-    setStatus(response?.changed ? "已给选中文本添加重音。" : "请先选择俄语文本。");
+    if (response?.unaccented) {
+      setStatus("已取消选中文本的重音。");
+    } else {
+      setStatus(response?.changed ? "已给选中文本添加重音。" : "请先选择俄语文本。");
+    }
   } catch (error) {
     setStatus("请打开普通网页后再试。浏览器内部页面不支持。");
   }
