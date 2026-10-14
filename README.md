@@ -1,6 +1,6 @@
 # 俄语重音助手 (Russian Stress Extension)
 
-[![GitHub Release](https://img.shields.io/github/v/release/wanxiao2018/russian-stress-extension?color=blue&label=Release)](https://github.com/wanxiao2018/russian-stress-extension/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/itsdangding/russian-stress-extension?color=blue&label=Release)](https://github.com/itsdangding/russian-stress-extension/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Data License: CC BY-SA 4.0](https://img.shields.io/badge/Data-CC%20BY--SA%204.0-orange.svg)](NOTICE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue.svg)](manifest.json)
@@ -38,14 +38,14 @@ A lightweight Chrome / Edge extension that displays Russian word stress marks di
 
 ### 方式一：下载已编译 Release 安装包（推荐普通用户）
 
-1. 前往 GitHub **[Releases 页面](https://github.com/wanxiao2018/russian-stress-extension/releases)** 下载最新的 `russian-stress-extension-v1.1.2.zip` 压缩包。
+1. 前往 GitHub **[Releases 页面](https://github.com/itsdangding/russian-stress-extension/releases)** 下载最新的 `russian-stress-extension-v1.1.2.zip` 压缩包。
 2. 将下载的 ZIP 压缩包解压到本地一个固定的目录（例如 `~/Extensions/russian-stress-extension`）。
 3. 打开基于 Chromium 的浏览器，在地址栏输入对应扩展管理地址：
    - **Google Chrome**: `chrome://extensions`
    - **Microsoft Edge**: `edge://extensions`
    - **Brave / Vivaldi / 360 等**: 打开「扩展程序」或「应用管理」页面
 4. 打开页面右上角（或左下角）的 **「开发者模式」 (Developer mode)** 开关。
-5. 点击 **「加载已解压的扩展程序」 (Load unpacked)**。
+5. 点击「加载已解压的扩展程序」 (Load unpacked)。
 6. 选择刚刚解压出来的文件夹根目录（包含 `manifest.json` 的目录）。
 7. 安装完成！点击浏览器右上角拼图图标，将「俄语重音助手」固定到工具栏方便使用。
 
@@ -58,7 +58,7 @@ A lightweight Chrome / Edge extension that displays Russian word stress marks di
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/wanxiao2018/russian-stress-extension.git
+git clone https://github.com/itsdangding/russian-stress-extension.git
 cd russian-stress-extension
 
 # 2. 安装依赖并运行测试
@@ -161,7 +161,7 @@ npm run package
 
 ## 📄 许可证与数据致谢
 
-1. **扩展源代码**：采用 [MIT License](LICENSE) 开源，版权所有 (c) 2026 wanxiao2018。
+1. **扩展源代码**：采用 [MIT License](LICENSE) 开源，版权所有 (c) 2026 Dang Ding。
 2. **离线重音词典 (`stress-data.json`)**：
    - 数据衍生自开源词典项目 [OpenRussian](https://github.com/Badestrand/russian-dictionary)。
    - 遵循知识共享署名-相同方式共享 4.0 国际许可协议 ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/))。
